@@ -74,7 +74,7 @@ Do **not** put application code or data in the root; keep it in dedicated direct
   - `data/` — input data, reference catalogs, cached downloads (gitignored if large or volatile).
   - `output/` or `results/` — generated artifacts (e.g. `stars_raw.csv`, `stars_clean.csv`, `plots/`). These are typically gitignored.
 - Paths in code should be configurable (e.g. environment variables, config file, or CLI arguments) so that data and output locations can be overridden without changing the package.
-- **Artifacts for release** (e.g. `stellar_seismic_catalog.zip`): built in a dedicated output directory or `dist/`; do not commit large binaries to the repo unless explicitly required.
+- **Result archive:** Obtained data must be packed into `stellar_seismic_catalog.zip` (see tech spec). The archive contains: README.md, stars_raw.csv, stars_clean.csv, plots/, scripts/, sources.txt. Build it in the output directory (e.g. `output/stellar_seismic_catalog.zip`) via `stellar-seismic-pack` or the package API `stellar_seismic_catalog.archive.build_result_archive`. Do not commit the zip to the repo.
 
 ---
 

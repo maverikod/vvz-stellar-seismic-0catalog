@@ -45,6 +45,7 @@ dev = [
 [project.scripts]
 stellar-seismic-download = "stellar_seismic_catalog.download:main"
 stellar-seismic-process = "stellar_seismic_catalog.process:main"
+stellar-seismic-pack = "stellar_seismic_catalog.pack:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

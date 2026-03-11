@@ -21,8 +21,11 @@ pip install -e .
 
 After install:
 
-- `stellar-seismic-download` — download catalogs
-- `stellar-seismic-process` — process and clean data, build plots
+- `stellar-seismic-download` — download catalogs (writes to `output/`, creates `sources.txt`)
+- `stellar-seismic-process` — process and clean data, build plots (writes CSVs and `plots/`)
+- `stellar-seismic-pack` — pack results into `stellar_seismic_catalog.zip` (README, CSVs, plots/, scripts/, sources.txt)
+
+Data must be obtained and then packed into the zip archive; run pack after process (or process can call the pack step internally).
 
 From the repo (no install):
 
