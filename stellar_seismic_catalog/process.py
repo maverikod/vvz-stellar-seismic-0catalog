@@ -45,6 +45,23 @@ def _select_clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+# Solar effective temperature (K) for L = (R/Rsun)^2 * (Teff/Teff_sun)^4
+_TEFF_SUN = 5772.0
+
+
+def _fill_luminosity_from_teff_radius(df: pd.DataFrame) -> pd.DataFrame:
+    """Where luminosity is missing, set L/Lsun = (R/Rsun)^2 * (Teff/Teff_sun)^4."""
+    out = df.copy()
+    if "luminosity" not in out.columns:
+        out["luminosity"] = float("nan")
+    need = out["luminosity"].isna() & out["radius"].notna() & out["Teff"].notna()
+    if need.any():
+        r = out.loc[need, "radius"]
+        t = out.loc[need, "Teff"]
+        out.loc[need, "luminosity"] = (r**2) * ((t / _TEFF_SUN) ** 4)
+    return out
+
+
 def _build_plots(clean_df: pd.DataFrame, plots_dir: Path) -> None:
     """Save radius vs luminosity, nu_max vs radius, delta_nu vs mass (PNG)."""
     import matplotlib.pyplot as plt
@@ -52,13 +69,22 @@ def _build_plots(clean_df: pd.DataFrame, plots_dir: Path) -> None:
     plots_dir.mkdir(parents=True, exist_ok=True)
     plt.rcParams["figure.figsize"] = (6, 4)
 
-    # 1. radius vs luminosity
+    # 1. radius vs luminosity (fill L from R, Teff when missing)
+    plot_df = _fill_luminosity_from_teff_radius(clean_df)
+    valid = plot_df["radius"].notna() & plot_df["luminosity"].notna()
+    valid = valid & (plot_df["luminosity"] > 0)
     fig, ax = plt.subplots()
-    ax.scatter(clean_df["radius"], clean_df["luminosity"], alpha=0.5, s=5)
+    ax.scatter(
+        plot_df.loc[valid, "radius"],
+        plot_df.loc[valid, "luminosity"],
+        alpha=0.5,
+        s=5,
+    )
     ax.set_xlabel("Radius (Rsun)")
-    ax.set_ylabel("Luminosity")
+    ax.set_ylabel("Luminosity (Lsun)")
     ax.set_title("Radius vs Luminosity")
     ax.set_xscale("log")
+    ax.set_yscale("log")
     fig.savefig(plots_dir / "radius_vs_luminosity.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
@@ -145,6 +171,7 @@ def run_process(
     raw = _load_raw(out)
     cleaned = _clean(raw)
     clean_df = _select_clean_columns(cleaned)
+    clean_df = _fill_luminosity_from_teff_radius(clean_df)
     clean_df.to_csv(out / "stars_clean.csv", index=False)
     _build_plots(clean_df, out / "plots")
     _write_readme(out, len(raw), len(clean_df))
