@@ -76,7 +76,7 @@ def run_pipeline(
     write_constants_json(out / "constants.json")
     sources = [
         "VizieR J/ApJS/239/32/table5 (APOKASC-2): evolutionary_stage, errors",
-        "Gaia DR3 I/355/gaiadr3: distance from parallax (CDS XMatch)",
+        "Gaia DR3 I/355/gaiadr3: distance (parallax), rotation (Vbroad) via CDS XMatch",
         "NIST ASD or fallback: atomic_reference_raw.csv",
     ]
     (out / "sources.txt").write_text("\n".join(sources), encoding="utf-8")
@@ -98,6 +98,8 @@ def run_pipeline(
     columns_added = [
         "evolutionary_stage",
         "stellar_class",
+        "distance",
+        "rotation",
         "radius_err",
         "mass_err",
         "luminosity_err",
@@ -118,7 +120,10 @@ def run_pipeline(
         "luminosity_computed",
         "luminosity_source",
     ]
-    columns_not_obtained = ["mode_width (not in APOKASC-2; left empty)"]
+    columns_not_obtained = [
+        "mode_width (not in base catalogs; left empty)",
+        "magnetic_activity (no source configured; left empty)",
+    ]
     readme = build_enriched_readme(
         n_stars=n,
         n_with_class=int(n_class.sum()),

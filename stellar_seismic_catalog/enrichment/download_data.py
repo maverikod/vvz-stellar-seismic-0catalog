@@ -71,6 +71,7 @@ def fetch_vizier_enrichment(output_dir: Path) -> pd.DataFrame:
 def fetch_gaia_distance(ra_dec_df: pd.DataFrame, output_dir: Path) -> pd.DataFrame:
     """
     Cross-match ra,dec with Gaia DR3 via CDS XMatch. Saves enrichment_gaia.csv.
+    Includes distance (from parallax) and rotation (from Vbroad/vsini when present).
     ra_dec_df must have columns ra, dec, star_id.
     """
     try:
@@ -78,7 +79,7 @@ def fetch_gaia_distance(ra_dec_df: pd.DataFrame, output_dir: Path) -> pd.DataFra
         import astropy.units as u
     except ImportError:
         output_dir.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(columns=["star_id", "distance"]).to_csv(
+        pd.DataFrame(columns=["star_id", "distance", "rotation"]).to_csv(
             output_dir / "enrichment_gaia.csv", index=False
         )
         return pd.DataFrame()
@@ -94,22 +95,28 @@ def fetch_gaia_distance(ra_dec_df: pd.DataFrame, output_dir: Path) -> pd.DataFra
             colDec1="dec",
         )
     except Exception:
-        pd.DataFrame(columns=["star_id", "distance"]).to_csv(
+        pd.DataFrame(columns=["star_id", "distance", "rotation"]).to_csv(
             output_dir / "enrichment_gaia.csv", index=False
         )
         return pd.DataFrame()
     try:
         df = result.to_pandas()
-        if "parallax" in df.columns and "star_id" in df.columns:
-            df = df[df["parallax"].notna() & (df["parallax"] > 0.1)]
-            df["distance"] = 1000.0 / df["parallax"]
-            out = df[["star_id", "distance"]].drop_duplicates(
+        plx_col = "parallax" if "parallax" in df.columns else "Plx"
+        if plx_col not in df.columns or "star_id" not in df.columns:
+            out = pd.DataFrame(columns=["star_id", "distance", "rotation"])
+        else:
+            df = df[df[plx_col].notna() & (df[plx_col] > 0.1)]
+            df["distance"] = 1000.0 / df[plx_col]
+            rot_col = "Vbroad" if "Vbroad" in df.columns else "vbroad"
+            if rot_col in df.columns:
+                df["rotation"] = df[rot_col]
+            else:
+                df["rotation"] = float("nan")
+            out = df[["star_id", "distance", "rotation"]].drop_duplicates(
                 subset=["star_id"], keep="first"
             )
-        else:
-            out = pd.DataFrame(columns=["star_id", "distance"])
     except Exception:
-        out = pd.DataFrame(columns=["star_id", "distance"])
+        out = pd.DataFrame(columns=["star_id", "distance", "rotation"])
     out.to_csv(output_dir / "enrichment_gaia.csv", index=False)
     return out
 

@@ -80,21 +80,27 @@ def merge_enrichment(
         ]
         if extra:
             base = base.merge(viz[["star_id"] + extra], on="star_id", how="left")
-    # Gaia: distance (overwrite where we have new value)
+    # Gaia: distance and rotation (overwrite where we have new value)
     gaia_path = enrichment_dir / "enrichment_gaia.csv"
     if gaia_path.exists():
         gaia = pd.read_csv(gaia_path)
         if "star_id" in gaia.columns and "distance" in gaia.columns and len(gaia) > 0:
             gaia["star_id"] = gaia["star_id"].astype(int)
             gaia = gaia.drop_duplicates(subset=["star_id"], keep="first")
-            base = base.merge(
-                gaia[["star_id", "distance"]].rename(
-                    columns={"distance": "distance_gaia"}
-                ),
-                on="star_id",
-                how="left",
+            rename = {"distance": "distance_gaia"}
+            if "rotation" in gaia.columns:
+                rename["rotation"] = "rotation_gaia"
+            cols = (
+                ["star_id", "distance", "rotation"]
+                if "rotation" in gaia.columns
+                else ["star_id", "distance"]
             )
+            merge_df = gaia[cols].rename(columns=rename)
+            base = base.merge(merge_df, on="star_id", how="left")
             if "distance_gaia" in base.columns:
                 base["distance"] = base["distance_gaia"].fillna(base["distance"])
                 base.drop(columns=["distance_gaia"], inplace=True)
+            if "rotation_gaia" in base.columns:
+                base["rotation"] = base["rotation_gaia"].fillna(base["rotation"])
+                base.drop(columns=["rotation_gaia"], inplace=True)
     return base
