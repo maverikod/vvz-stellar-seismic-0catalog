@@ -1,0 +1,18 @@
+# Author: Vasiliy Zdanovskiy
+# email: vasilyvz@gmail.com
+# Include files for sdist; exclude dev/data/logs for PyPI.
+
+include README.md
+include LICENSE
+include pyproject.toml
+include projectid
+recursive-include stellar_seismic_catalog *.py
+recursive-exclude tests *
+recursive-exclude docs *
+recursive-exclude data *
+recursive-exclude output *
+recursive-exclude logs *
+recursive-exclude scripts *
+global-exclude __pycache__
+global-exclude .venv
+global-exclude *.egg-info

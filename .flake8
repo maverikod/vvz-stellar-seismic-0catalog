@@ -1,0 +1,7 @@
+# Match Black line length
+# Author: Vasiliy Zdanovskiy
+# email: vasilyvz@gmail.com
+
+[flake8]
+max-line-length = 88
+extend-ignore = E203

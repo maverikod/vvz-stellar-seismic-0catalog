@@ -1,0 +1,128 @@
+# Layout standards: code, documentation, data, logs
+
+**Author:** Vasiliy Zdanovskiy  
+**email:** vasilyvz@gmail.com  
+
+This document defines where to place code, documentation, data, and logs for a Python project published on PyPI **without** the `src/` layout (flat layout).
+
+---
+
+## 1. Repository root
+
+At the repository root (GitHub/GitLab, etc.):
+
+- **Version and packaging:** `pyproject.toml`, `setup.cfg` (if used), `MANIFEST.in`
+- **Readme and license:** `README.md`, `LICENSE`
+- **Config and tooling:** `.gitignore`, `.flake8`, `mypy.ini` (or config in `pyproject.toml`)
+- **Project id:** `projectid` (project identifier for internal tools)
+- **Specification:** `tech.spec.md` or similar at root is acceptable
+
+Do **not** put application code or data in the root; keep it in dedicated directories below.
+
+---
+
+## 2. Code layout (no `src/`)
+
+### 2.1 Importable package
+
+- **Single top-level package** at the repository root, same name as the PyPI project (e.g. `stellar_seismic_catalog/`).
+- All importable code lives inside this directory:
+  - `stellar_seismic_catalog/__init__.py`
+  - `stellar_seismic_catalog/<module>.py` or `stellar_seismic_catalog/<subpackage>/`
+- This directory is the one declared in `pyproject.toml` as `packages` (or equivalent); it is what gets installed with `pip install <package>`.
+
+### 2.2 Scripts and entry points
+
+- **CLI/runner scripts** that are not part of the importable API:
+  - Place in `scripts/` at the repository root (e.g. `scripts/download_catalogs.py`, `scripts/process_catalogs.py`).
+- Prefer **entry points** in `pyproject.toml` for user-facing commands, e.g.:
+
+  ```toml
+  [project.scripts]
+  stellar-seismic-download = "stellar_seismic_catalog.scripts.download:main"
+  stellar-seismic-process = "stellar_seismic_catalog.scripts.process:main"
+  ```
+
+  Then the actual logic can live in the package (e.g. `stellar_seismic_catalog/scripts/`) and the `scripts/` folder can contain thin wrappers or legacy scripts if needed.
+
+- **Tests:** `tests/` at the repository root. Tests import the package by name (as installed or via `PYTHONPATH`). Do not put tests inside the package directory.
+
+### 2.3 File size and structure
+
+- Keep each code file under **350–400 lines**.
+- One main class per file (except small enums/exceptions).
+- Split large modules into a facade plus smaller submodules.
+
+---
+
+## 3. Documentation
+
+- **Location:** `docs/` at the repository root.
+- **Content:**
+  - User-facing: installation, usage, configuration, examples.
+  - Project: layout standards (this file), project rules, plans, bug reports.
+- **Format:** Markdown (`.md`) unless another format is required (e.g. Sphinx).
+- **Language:** English unless the product owner explicitly requests another language.
+- Do **not** put ad-hoc analyses or one-off Q&A into `docs/`; keep those in chat or separate notes unless explicitly requested in the repo.
+
+---
+
+## 4. Data
+
+- **Input/raw data and generated outputs** must **not** live inside the importable package directory.
+- **Recommended directories** at the repository root:
+  - `data/` — input data, reference catalogs, cached downloads (gitignored if large or volatile).
+  - `output/` or `results/` — generated artifacts (e.g. `stars_raw.csv`, `stars_clean.csv`, `plots/`). These are typically gitignored.
+- Paths in code should be configurable (e.g. environment variables, config file, or CLI arguments) so that data and output locations can be overridden without changing the package.
+- **Artifacts for release** (e.g. `stellar_seismic_catalog.zip`): built in a dedicated output directory or `dist/`; do not commit large binaries to the repo unless explicitly required.
+
+---
+
+## 5. Logs
+
+- **Directory:** `logs/` at the repository root (or a path set by configuration).
+- Log files are **gitignored** (e.g. `*.log`, `logs/`).
+- Use a single configured log directory; avoid scattering log files next to code or data.
+- Log file naming: include date or run id (e.g. `run_20250311.log`, `download_<timestamp>.log`) to support debugging and rotation.
+
+---
+
+## 6. Summary layout (flat, no `src/`)
+
+```
+<repo_root>/
+  pyproject.toml
+  README.md
+  LICENSE
+  projectid
+  .gitignore
+
+  stellar_seismic_catalog/     # importable package (PyPI)
+    __init__.py
+    ...
+
+  scripts/                     # CLI / one-off scripts
+    download_catalogs.py
+    process_catalogs.py
+
+  tests/
+    ...
+
+  docs/                        # all project documentation
+    LAYOUT_STANDARDS.md
+    PROJECT_RULES.md
+    ...
+
+  data/                        # input/cached data (gitignore as needed)
+  output/                      # or results/ — generated CSVs, plots (gitignore)
+  logs/                        # runtime logs (gitignore)
+```
+
+---
+
+## 7. PyPI and MANIFEST.in
+
+- **Include** in the sdist: package dir, `pyproject.toml`, `README.md`, `LICENSE`, and any files listed in `pyproject.toml` (e.g. `include`).
+- **Exclude** from the sdist: `tests/`, `docs/` (unless you ship them on purpose), `data/`, `output/`, `logs/`, `.venv/`, and other development-only paths. Use `MANIFEST.in` or `pyproject.toml`’s `tool.setuptools` (e.g. `include`/`exclude`) so that only necessary files are published to PyPI.
+
+These layout standards ensure a clear separation between installable code, documentation, data, and logs, and keep the project suitable for GitHub and PyPI without a `src/` layout.
