@@ -38,6 +38,7 @@ env/
 *.root
 *.zip
 output/
+output_enriched/
 data/
 logs/
 *.log
