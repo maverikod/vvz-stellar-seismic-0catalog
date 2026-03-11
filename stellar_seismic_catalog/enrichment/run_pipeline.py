@@ -17,11 +17,16 @@ from stellar_seismic_catalog.enrichment.download_data import (
     fetch_atomic_reference,
     fetch_gaia_distance,
     fetch_vizier_enrichment,
+    fetch_vizier_magnetic_activity,
+    fetch_vizier_mode_width,
 )
 from stellar_seismic_catalog.enrichment.merge_data import (
     load_base_catalog,
     load_base_raw,
     merge_enrichment,
+)
+from stellar_seismic_catalog.enrichment.empty_columns_report import (
+    print_empty_columns_report,
 )
 from stellar_seismic_catalog.enrichment.plots_enriched import build_plots
 from stellar_seismic_catalog.build_full_archive import build_full_archive
@@ -59,6 +64,8 @@ def run_pipeline(
     # 1. Download
     viz_df = fetch_vizier_enrichment(enrich_dir)
     fetch_gaia_distance(viz_df[["star_id", "ra", "dec"]], enrich_dir)
+    fetch_vizier_mode_width(enrich_dir)
+    fetch_vizier_magnetic_activity(enrich_dir)
     fetch_atomic_reference(out)
 
     # 2. Merge
@@ -68,6 +75,7 @@ def run_pipeline(
     # 3. Compute
     analysis = run_compute(merged)
     analysis.to_csv(out / "stars_analysis_ready.csv", index=False)
+    print_empty_columns_report(analysis)
 
     # 4. Plots
     build_plots(analysis, out / "plots")
@@ -77,6 +85,8 @@ def run_pipeline(
     sources = [
         "VizieR J/ApJS/239/32/table5 (APOKASC-2): evolutionary_stage, errors",
         "Gaia DR3 I/355/gaiadr3: distance (parallax), rotation (Vbroad) via CDS XMatch",
+        "VizieR J/A+A/616/A94/dataprob (Vrard+): mode_width (Gamma0), merge by KIC",
+        "VizieR J/A+A/616/A108 (Boro Saikia+): magnetic_activity (Smean), by position",
         "NIST ASD or fallback: atomic_reference_raw.csv",
     ]
     (out / "sources.txt").write_text("\n".join(sources), encoding="utf-8")

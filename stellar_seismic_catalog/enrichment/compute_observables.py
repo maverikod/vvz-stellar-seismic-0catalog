@@ -85,8 +85,12 @@ def ensure_error_columns_absolute(df: pd.DataFrame) -> pd.DataFrame:
     """Ensure *_err columns exist and are numeric."""
     out = df.copy()
     err_cols = [
-        "radius_err", "mass_err", "luminosity_err",
-        "nu_max_err", "delta_nu_err", "Teff_err",
+        "radius_err",
+        "mass_err",
+        "luminosity_err",
+        "nu_max_err",
+        "delta_nu_err",
+        "Teff_err",
     ]
     for col in err_cols:
         if col not in out.columns:

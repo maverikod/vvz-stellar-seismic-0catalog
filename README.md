@@ -112,7 +112,7 @@ Optional env: `STELLAR_SEISMIC_REPO` (default: current dir), `STELLAR_SEISMIC_OU
 
 ## Outputs
 
-- **Base:** `stars_raw.csv`, `stars_clean.csv` (cleaned: non-null radius/nu_max, relative errors ≤ 20%), plots (radius vs luminosity, nu_max vs radius, delta_nu vs mass).  
+- **Base:** `stars_raw.csv`, `stars_clean.csv` (cleaned: non-null radius/nu_max, relative errors ≤ 20%), plots (radius vs luminosity, nu_max vs radius, delta_nu vs mass). Columns include **metallicity [Fe/H]** and **age** (log_age_Myr, age_Myr) from APOKASC-2; **rotation** and **magnetic_activity** are present but empty (not in APOKASC-2).
 - **Enriched:** Solar-normalized columns, derived observables (mean_density_proxy, surface_gravity_proxy, energy_proxy, q_proxy), luminosity_computed/luminosity_source, evolutionary_stage and error columns where available; constants.json with solar constants; extra plots and atomic reference table.
 
 ---

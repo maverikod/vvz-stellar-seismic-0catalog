@@ -37,6 +37,9 @@ env/
 *.parquet
 *.root
 *.zip
+stellar_seismic_catalog.zip
+stellar_seismic_catalog_enriched.zip
+stellar_seismic_catalog_full.zip
 output/
 output_enriched/
 data/

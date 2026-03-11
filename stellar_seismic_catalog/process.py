@@ -45,6 +45,17 @@ def _select_clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _fill_age_myr(df: pd.DataFrame) -> pd.DataFrame:
+    """Set age_Myr = 10**log_age_Myr where log_age_Myr is valid."""
+    out = df.copy()
+    if "log_age_Myr" not in out.columns:
+        return out
+    valid = out["log_age_Myr"].notna()
+    if valid.any():
+        out.loc[valid, "age_Myr"] = 10.0 ** out.loc[valid, "log_age_Myr"]
+    return out
+
+
 # Solar effective temperature (K) for L = (R/Rsun)^2 * (Teff/Teff_sun)^4
 _TEFF_SUN = 5772.0
 
@@ -114,17 +125,22 @@ def _write_readme(output_dir: Path, n_raw: int, n_clean: int) -> None:
         f"- **{c['name']}**: {c['catalog_id']} — {c['url']}" for c in VIZIER_CATALOGS
     )
     column_desc = """
-| Column    | Description |
-|-----------|-------------|
-| star_id   | Star identifier (e.g. KIC) |
-| radius    | Stellar radius (Rsun) |
-| mass      | Stellar mass (Msun) |
-| luminosity| Luminosity (if available) |
-| nu_max    | Frequency of maximum power (uHz) |
-| delta_nu  | Large frequency spacing (uHz) |
-| mode_width| Mode width (if available) |
-| Teff      | Effective temperature (K) |
-| distance  | Distance (if available) |
+| Column          | Description |
+|-----------------|-------------|
+| star_id         | Star identifier (e.g. KIC) |
+| radius          | Stellar radius (Rsun) |
+| mass            | Stellar mass (Msun) |
+| luminosity      | Luminosity (if available) |
+| nu_max          | Frequency of maximum power (uHz) |
+| delta_nu        | Large frequency spacing (uHz) |
+| mode_width      | Mode width (if available) |
+| Teff            | Effective temperature (K) |
+| distance        | Distance (if available) |
+| metallicity     | [Fe/H] (dex), from catalog |
+| log_age_Myr      | log10(age in Myr), from catalog |
+| age_Myr         | Age (Myr), 10^log_age_Myr |
+| rotation        | Rotation (e.g. vsini); empty if not in catalog |
+| magnetic_activity | Magnetic activity index; empty if not in catalog |
 """
     content = f"""# Stellar Seismic Catalog
 
@@ -171,6 +187,7 @@ def run_process(
     raw = _load_raw(out)
     cleaned = _clean(raw)
     clean_df = _select_clean_columns(cleaned)
+    clean_df = _fill_age_myr(clean_df)
     clean_df = _fill_luminosity_from_teff_radius(clean_df)
     clean_df.to_csv(out / "stars_clean.csv", index=False)
     _build_plots(clean_df, out / "plots")

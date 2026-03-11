@@ -49,20 +49,22 @@ def fetch_vizier_enrichment(output_dir: Path) -> pd.DataFrame:
     out["evolutionary_stage"] = (
         df["ES"].map(_map_evolutionary_stage) if "ES" in df.columns else ""
     )
-    out["stellar_class"] = ""  # APOKASC-2 has no spectral class
-    # Errors: fractional where applicable; convert to absolute where needed
+    # Stellar class: use ES code (e.g. RGB, RC) when evolutionary_stage is set
+    out["stellar_class"] = (
+        df["ES"].fillna("").astype(str).str.strip() if "ES" in df.columns else ""
+    )
+    # Errors: s_M(cor), s_R(cor) (fractional); Teff/numax/Dnu errs not in table5
     for vizier_col, our_col in [
-        ("e_Teff", "Teff_err"),
-        ("e_Numax", "nu_max_err"),  # fractional
-        ("e_Dnu", "delta_nu_err"),  # fractional
-        ("e_M(cor)", "mass_err"),  # fractional
-        ("e_R(cor)", "radius_err"),  # fractional
+        ("s_M(cor)", "mass_err"),
+        ("s_R(cor)", "radius_err"),
     ]:
         if vizier_col in df.columns:
             out[our_col] = df[vizier_col]
         else:
             out[our_col] = float("nan")
-    out["luminosity_err"] = float("nan")  # not in APOKASC-2
+    for our_col in ["Teff_err", "nu_max_err", "delta_nu_err", "luminosity_err"]:
+        if our_col not in out.columns:
+            out[our_col] = float("nan")
     output_dir.mkdir(parents=True, exist_ok=True)
     out.to_csv(output_dir / "enrichment_vizier.csv", index=False)
     return out
@@ -85,10 +87,14 @@ def fetch_gaia_distance(ra_dec_df: pd.DataFrame, output_dir: Path) -> pd.DataFra
         return pd.DataFrame()
     output_dir.mkdir(parents=True, exist_ok=True)
     upload_path = output_dir / "upload_ra_dec.csv"
-    ra_dec_df[["star_id", "ra", "dec"]].head(10000).to_csv(upload_path, index=False)
+    upload_df = ra_dec_df[["star_id", "ra", "dec"]].head(10000)
+    upload_df.to_csv(upload_path, index=False)
     try:
+        from astropy.table import Table
+
+        cat1_table = Table.from_pandas(upload_df)
         result = XMatch.query(
-            cat1=str(upload_path),
+            cat1=cat1_table,
             cat2="I/355/gaiadr3",
             max_distance=2 * u.arcsec,
             colRA1="ra",
@@ -102,23 +108,110 @@ def fetch_gaia_distance(ra_dec_df: pd.DataFrame, output_dir: Path) -> pd.DataFra
     try:
         df = result.to_pandas()
         plx_col = "parallax" if "parallax" in df.columns else "Plx"
-        if plx_col not in df.columns or "star_id" not in df.columns:
+        if plx_col not in df.columns:
             out = pd.DataFrame(columns=["star_id", "distance", "rotation"])
         else:
-            df = df[df[plx_col].notna() & (df[plx_col] > 0.1)]
-            df["distance"] = 1000.0 / df[plx_col]
-            rot_col = "Vbroad" if "Vbroad" in df.columns else "vbroad"
-            if rot_col in df.columns:
-                df["rotation"] = df[rot_col]
+            df = df[df[plx_col].notna() & (df[plx_col] > 0.1)].copy()
+            if df.empty:
+                out = pd.DataFrame(columns=["star_id", "distance", "rotation"])
             else:
-                df["rotation"] = float("nan")
-            out = df[["star_id", "distance", "rotation"]].drop_duplicates(
-                subset=["star_id"], keep="first"
-            )
+                df["distance"] = 1000.0 / df[plx_col]
+                rot_col = "vbroad" if "vbroad" in df.columns else "Vbroad"
+                df["rotation"] = df[rot_col] if rot_col in df.columns else float("nan")
+                if "star_id" not in df.columns:
+                    ra_col = (
+                        "ra"
+                        if "ra" in df.columns
+                        else next(
+                            (
+                                c
+                                for c in df.columns
+                                if "ra" in c.lower() and "rad" not in c.lower()
+                            ),
+                            None,
+                        )
+                    )
+                    dec_col = (
+                        "dec"
+                        if "dec" in df.columns
+                        else next((c for c in df.columns if "dec" in c.lower()), None)
+                    )
+                    if ra_col and dec_col and not ra_dec_df.empty:
+                        match = (
+                            ra_dec_df[["star_id", "ra", "dec"]]
+                            .drop_duplicates(subset=["ra", "dec"], keep="first")
+                            .copy()
+                        )
+                        match["ra"] = match["ra"].round(6)
+                        match["dec"] = match["dec"].round(6)
+                        df = df.copy()
+                        df["ra"] = df[ra_col].astype(float).round(6)
+                        df["dec"] = df[dec_col].astype(float).round(6)
+                        df = df.merge(match, on=["ra", "dec"], how="left")
+                    else:
+                        df["star_id"] = float("nan")
+                out = df[["star_id", "distance", "rotation"]].drop_duplicates(
+                    subset=["star_id"], keep="first"
+                )
+                out = out[out["star_id"].notna()]
     except Exception:
         out = pd.DataFrame(columns=["star_id", "distance", "rotation"])
     out.to_csv(output_dir / "enrichment_gaia.csv", index=False)
     return out
+
+
+def fetch_vizier_mode_width(output_dir: Path) -> pd.DataFrame:
+    """
+    Fetch mode width (Gamma0) from Vrard+ 2018, J/A+A/616/A94/dataprob.
+    Saves enrichment_mode_width.csv with star_id (KIC), mode_width (Gamma0).
+    """
+    from astroquery.vizier import Vizier
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / "enrichment_mode_width.csv"
+    try:
+        Vizier.ROW_LIMIT = -1
+        cat = Vizier.get_catalogs("J/A+A/616/A94/dataprob")[0]
+        df = cat.to_pandas()
+        out = pd.DataFrame()
+        out["star_id"] = df["KIC"].astype(int)
+        out["mode_width"] = df["Gamma0"] if "Gamma0" in df.columns else float("nan")
+        out.to_csv(out_path, index=False)
+        return out
+    except Exception:
+        pd.DataFrame(columns=["star_id", "mode_width"]).to_csv(out_path, index=False)
+        return pd.DataFrame()
+
+
+def fetch_vizier_magnetic_activity(output_dir: Path) -> pd.DataFrame:
+    """
+    Fetch chromospheric activity from Boro Saikia+ 2018, J/A+A/616/A108/catalog.
+    Saves enrichment_activity.csv with ra, dec, magnetic_activity (Smean).
+    Merge in pipeline by position (ra, dec).
+    """
+    from astroquery.vizier import Vizier
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / "enrichment_activity.csv"
+    try:
+        Vizier.ROW_LIMIT = -1
+        cat = Vizier.get_catalogs("J/A+A/616/A108/catalog")[0]
+        df = cat.to_pandas()
+        out = pd.DataFrame()
+        out["ra"] = df["_RA"] if "_RA" in df.columns else float("nan")
+        out["dec"] = df["_DE"] if "_DE" in df.columns else float("nan")
+        out["magnetic_activity"] = (
+            df["Smean"]
+            if "Smean" in df.columns
+            else (df["logRpHK"] if "logRpHK" in df.columns else float("nan"))
+        )
+        out.to_csv(out_path, index=False)
+        return out
+    except Exception:
+        pd.DataFrame(columns=["ra", "dec", "magnetic_activity"]).to_csv(
+            out_path, index=False
+        )
+        return pd.DataFrame()
 
 
 def fetch_atomic_reference(output_dir: Path) -> Path:

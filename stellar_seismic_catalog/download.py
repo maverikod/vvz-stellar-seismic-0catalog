@@ -47,22 +47,40 @@ def _normalize_catalog(
     return out
 
 
+def _fetch_one_catalog(cfg: dict) -> pd.DataFrame:
+    """Fetch one catalog (single table or table1+table2 merge) and return normalized DataFrame."""
+    cat_id = cast(str, cfg["catalog_id"])
+    name = cast(str, cfg["name"])
+    col_map = cast(dict[str, str | None], cfg["column_map"])
+    err_cols = cast(dict[str, str], cfg.get("error_columns") or {})
+    table2_id = cfg.get("table2_id")
+    merge_key = cfg.get("merge_key")
+    df = _fetch_vizier_catalog(cat_id)
+    if table2_id and merge_key and df is not None and not df.empty:
+        df2 = _fetch_vizier_catalog(cast(str, table2_id))
+        if df2 is not None and not df2.empty and merge_key in df.columns and merge_key in df2.columns:
+            df[merge_key] = df[merge_key].astype(str)
+            df2[merge_key] = df2[merge_key].astype(str)
+            df = df.merge(df2, on=merge_key, how="left", suffixes=("", "_2"))
+            for col in list(df.columns):
+                if col.endswith("_2"):
+                    df.drop(columns=[col], inplace=True)
+    if df.empty:
+        return pd.DataFrame()
+    return _normalize_catalog(df, col_map, err_cols, name)
+
+
 def _fetch_all() -> pd.DataFrame:
     """Fetch all configured catalogs and concatenate."""
     frames: list[pd.DataFrame] = []
     for cfg in VIZIER_CATALOGS:
-        cat_id = cast(str, cfg["catalog_id"])
-        name = cast(str, cfg["name"])
-        col_map = cast(dict[str, str | None], cfg["column_map"])
-        err_cols = cast(dict[str, str], cfg.get("error_columns") or {})
         try:
-            df = _fetch_vizier_catalog(cat_id)
+            df_norm = _fetch_one_catalog(cfg)
         except Exception as e:
+            cat_id = cfg.get("catalog_id", "?")
             raise RuntimeError(f"Failed to fetch {cat_id}: {e}") from e
-        if df.empty:
-            continue
-        df_norm = _normalize_catalog(df, col_map, err_cols, name)
-        frames.append(df_norm)
+        if not df_norm.empty:
+            frames.append(df_norm)
     if not frames:
         return pd.DataFrame()
     combined = pd.concat(frames, ignore_index=True)

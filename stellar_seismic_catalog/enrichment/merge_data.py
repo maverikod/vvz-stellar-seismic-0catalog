@@ -68,6 +68,8 @@ def merge_enrichment(
             if c != "star_id"
             and c
             in [
+                "ra",
+                "dec",
                 "evolutionary_stage",
                 "stellar_class",
                 "Teff_err",
@@ -103,4 +105,45 @@ def merge_enrichment(
             if "rotation_gaia" in base.columns:
                 base["rotation"] = base["rotation_gaia"].fillna(base["rotation"])
                 base.drop(columns=["rotation_gaia"], inplace=True)
+    # Mode width: Vrard+ 2018, merge on star_id (KIC)
+    mw_path = enrichment_dir / "enrichment_mode_width.csv"
+    if mw_path.exists():
+        mw = pd.read_csv(mw_path)
+        if "star_id" in mw.columns and "mode_width" in mw.columns and len(mw) > 0:
+            mw["star_id"] = mw["star_id"].astype(int)
+            mw = mw.drop_duplicates(subset=["star_id"], keep="first")
+            base = base.merge(
+                mw[["star_id", "mode_width"]],
+                on="star_id",
+                how="left",
+                suffixes=("", "_mw"),
+            )
+            if "mode_width_mw" in base.columns:
+                base["mode_width"] = base["mode_width_mw"].fillna(base["mode_width"])
+                base.drop(columns=["mode_width_mw"], inplace=True)
+    # Magnetic activity: Boro Saikia+ 2018, merge by position (ra, dec)
+    act_path = enrichment_dir / "enrichment_activity.csv"
+    if act_path.exists() and "ra" in base.columns and "dec" in base.columns:
+        act = pd.read_csv(act_path)
+        if "magnetic_activity" in act.columns and len(act) > 0:
+            for key in ["ra", "dec"]:
+                if key in act.columns:
+                    act[key] = pd.to_numeric(act[key], errors="coerce")
+            act["ra"] = act["ra"].round(5)
+            act["dec"] = act["dec"].round(5)
+            act = act.drop_duplicates(subset=["ra", "dec"], keep="first")
+            b = base.copy()
+            b["ra"] = pd.to_numeric(b["ra"], errors="coerce").round(5)
+            b["dec"] = pd.to_numeric(b["dec"], errors="coerce").round(5)
+            b = b.merge(
+                act[["ra", "dec", "magnetic_activity"]].rename(
+                    columns={"magnetic_activity": "magnetic_activity_act"}
+                ),
+                on=["ra", "dec"],
+                how="left",
+            )
+            if "magnetic_activity_act" in b.columns:
+                base["magnetic_activity"] = b["magnetic_activity_act"].fillna(
+                    base["magnetic_activity"]
+                )
     return base
