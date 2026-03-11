@@ -24,17 +24,24 @@ from stellar_seismic_catalog.enrichment.merge_data import (
     merge_enrichment,
 )
 from stellar_seismic_catalog.enrichment.plots_enriched import build_plots
+from stellar_seismic_catalog.build_full_archive import build_full_archive
 
 
 def run_pipeline(
     input_zip: str | Path | None = None,
     fallback_dir: str | Path | None = None,
     output_dir: str | Path = "output_enriched",
+    output_base: str | Path = "output",
     scripts_dir: str | Path | None = None,
+    repo_root: str | Path | None = None,
+    build_full: bool = True,
 ) -> Path:
     """
-    Run download -> merge -> compute -> plots -> README -> constants -> sources -> zip.
-    Returns path to stellar_seismic_catalog_enriched.zip.
+    Run download -> merge -> compute -> plots -> README -> zip -> full archive.
+
+    If build_full is True and no errors, builds stellar_seismic_catalog_full.zip
+    (docs + data + plots + scripts) after the enriched zip.
+    Returns path to stellar_seismic_catalog_full.zip when build_full else enriched zip.
     """
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -124,29 +131,45 @@ def run_pipeline(
         sources_list=sources,
     )
 
-    # 7. Zip
-    scripts_src = scripts_dir or Path.cwd() / "scripts"
-    zip_path = build_enriched_archive(
+    # 7. Enriched zip
+    repo = Path(repo_root) if repo_root is not None else Path.cwd()
+    base_out = Path(output_base)
+    scripts_src = scripts_dir or repo / "scripts"
+    enriched_zip = build_enriched_archive(
         output_dir=out,
         zip_path=out / "stellar_seismic_catalog_enriched.zip",
         scripts_dir=scripts_src,
         readme_content=readme,
     )
-    return zip_path
+    if not build_full:
+        return enriched_zip
+    # 8. Full archive (docs + data + plots + scripts), overwrites previous
+    full_zip = build_full_archive(
+        repo_root=repo,
+        output_base=base_out,
+        output_enriched=out,
+        scripts_dir=scripts_src,
+        zip_path=repo / "stellar_seismic_catalog_full.zip",
+    )
+    return full_zip
 
 
 def main() -> None:
-    """CLI entry point: run pipeline using env vars for paths."""
+    """CLI: run pipeline from env paths; builds full archive (docs+data) at end."""
     import os
 
     input_zip = os.environ.get("STELLAR_SEISMIC_INPUT_ZIP")
     fallback = os.environ.get("STELLAR_SEISMIC_OUTPUT", "output")
     output = os.environ.get("STELLAR_SEISMIC_ENRICHED_OUTPUT", "output_enriched")
     scripts_dir = os.environ.get("STELLAR_SEISMIC_SCRIPTS")
+    repo = os.environ.get("STELLAR_SEISMIC_REPO", ".")
     zip_path = run_pipeline(
         input_zip=input_zip,
         fallback_dir=fallback,
         output_dir=output,
+        output_base=fallback,
         scripts_dir=Path(scripts_dir) if scripts_dir else None,
+        repo_root=Path(repo),
+        build_full=True,
     )
-    print(f"Enriched archive: {zip_path}")
+    print(f"Full archive: {zip_path}")
