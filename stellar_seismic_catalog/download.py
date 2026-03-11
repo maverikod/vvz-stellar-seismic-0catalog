@@ -7,6 +7,7 @@ email: vasilyvz@gmail.com
 
 import os
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
@@ -50,16 +51,17 @@ def _fetch_all() -> pd.DataFrame:
     """Fetch all configured catalogs and concatenate."""
     frames: list[pd.DataFrame] = []
     for cfg in VIZIER_CATALOGS:
-        cat_id = cfg["catalog_id"]
-        name = cfg["name"]
+        cat_id = cast(str, cfg["catalog_id"])
+        name = cast(str, cfg["name"])
+        col_map = cast(dict[str, str | None], cfg["column_map"])
+        err_cols = cast(dict[str, str], cfg.get("error_columns") or {})
         try:
             df = _fetch_vizier_catalog(cat_id)
         except Exception as e:
             raise RuntimeError(f"Failed to fetch {cat_id}: {e}") from e
         if df.empty:
             continue
-        err_cols = cfg.get("error_columns") or {}
-        df_norm = _normalize_catalog(df, cfg["column_map"], err_cols, name)
+        df_norm = _normalize_catalog(df, col_map, err_cols, name)
         frames.append(df_norm)
     if not frames:
         return pd.DataFrame()

@@ -37,7 +37,8 @@ def write_constants_json(output_path: str | Path) -> Path:
     return out
 
 
-def load_constants_json(path: str | Path) -> dict:
+def load_constants_json(path: str | Path) -> dict[str, float]:
     """Load constants from JSON."""
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    return dict(data)
