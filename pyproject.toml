@@ -47,6 +47,7 @@ stellar-seismic-download = "stellar_seismic_catalog.download:main"
 stellar-seismic-process = "stellar_seismic_catalog.process:main"
 stellar-seismic-pack = "stellar_seismic_catalog.pack:main"
 stellar-seismic-enrich = "stellar_seismic_catalog.enrichment.run_pipeline:main"
+stellar-seismic-full-archive = "stellar_seismic_catalog.build_full_archive:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -92,6 +92,22 @@ python scripts/compute_observables.py
 
 - **Result:** `output_enriched/stellar_seismic_catalog_enriched.zip` with README, stars_raw.csv, stars_enriched.csv, stars_analysis_ready.csv, atomic_reference_raw.csv, constants.json, sources.txt, plots/, scripts/.
 
+### 3. Full archive (all data + documentation)
+
+Pack all data and project documentation into one zip:
+
+```bash
+stellar-seismic-full-archive
+```
+
+Optional env: `STELLAR_SEISMIC_REPO` (default: current dir), `STELLAR_SEISMIC_OUTPUT`, `STELLAR_SEISMIC_ENRICHED_OUTPUT`.
+
+- **Result:** `stellar_seismic_catalog_full.zip` in repo root with:
+  - **Docs:** README.md, tech.spec.md, docs/ (LAYOUT_STANDARDS.md, PROJECT_RULES.md)
+  - **Data:** data/stars_raw.csv, data/stars_clean.csv, data/stars_enriched.csv, data/stars_analysis_ready.csv, data/atomic_reference_raw.csv, data/constants.json, data/sources.txt
+  - **Plots:** plots/*.png
+  - **Scripts:** scripts/*.py
+
 ---
 
 ## Outputs
